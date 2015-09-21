@@ -17,6 +17,7 @@ type Server struct {
 	IssueEvents        chan *github.IssueEvent
 	IssueCommentEvents chan *github.IssueCommentEvent
 	PullRequestEvents  chan *github.PullRequestEvent
+	OtherEvents        chan *github.Event
 }
 
 func New(secret string) *Server {
@@ -26,6 +27,7 @@ func New(secret string) *Server {
 		IssueEvents:        make(chan *github.IssueEvent),
 		IssueCommentEvents: make(chan *github.IssueCommentEvent),
 		PullRequestEvents:  make(chan *github.PullRequestEvent),
+		OtherEvents:        make(chan *github.Event),
 	}
 }
 
@@ -68,6 +70,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var handler func(body []byte) error
 
+	// https://developer.github.com/webhooks/
 	if eventType == "push" {
 		handler = s.pushEventHandler
 	} else if eventType == "issues" {
@@ -76,6 +79,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		handler = s.issueCommentEventHandler
 	} else if eventType == "pull_request" {
 		handler = s.pullRequestEventHandler
+	} else {
+		handler = s.eventHandler
 	}
 
 	if err := handler(body); err != nil {
@@ -137,6 +142,21 @@ func (s *Server) pullRequestEventHandler(body []byte) error {
 
 	select {
 	case s.PullRequestEvents <- event:
+	default:
+	}
+
+	return nil
+}
+
+func (s *Server) eventHandler(body []byte) error {
+	var event *github.Event
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case s.OtherEvents <- event:
 	default:
 	}
 

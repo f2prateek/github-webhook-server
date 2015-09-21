@@ -12,16 +12,18 @@ import (
 )
 
 type Server struct {
-	secret      string
-	PushEvents  chan *github.PushEvent
-	IssueEvents chan *github.IssueEvent
+	secret             string
+	PushEvents         chan *github.PushEvent
+	IssueEvents        chan *github.IssueEvent
+	IssueCommentEvents chan *github.IssueCommentEvent
 }
 
 func New(secret string) *Server {
 	return &Server{
-		secret:      secret,
-		PushEvents:  make(chan *github.PushEvent),
-		IssueEvents: make(chan *github.IssueEvent),
+		secret:             secret,
+		PushEvents:         make(chan *github.PushEvent),
+		IssueEvents:        make(chan *github.IssueEvent),
+		IssueCommentEvents: make(chan *github.IssueCommentEvent),
 	}
 }
 
@@ -66,8 +68,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if eventType == "push" {
 		handler = s.pushEventHandler
-	} else if eventType == "issue" {
+	} else if eventType == "issues" {
 		handler = s.issueEventHandler
+	} else if eventType == "issue_comment" {
+		handler = s.issueCommentEventHandler
 	}
 
 	if err := handler(body); err != nil {
@@ -99,6 +103,21 @@ func (s *Server) issueEventHandler(body []byte) error {
 
 	select {
 	case s.IssueEvents <- event:
+	default:
+	}
+
+	return nil
+}
+
+func (s *Server) issueCommentEventHandler(body []byte) error {
+	var event *github.IssueCommentEvent
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case s.IssueCommentEvents <- event:
 	default:
 	}
 

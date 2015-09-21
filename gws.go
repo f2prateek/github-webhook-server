@@ -12,14 +12,16 @@ import (
 )
 
 type Server struct {
-	secret     string
-	PushEvents chan *github.PushEvent
+	secret      string
+	PushEvents  chan *github.PushEvent
+	IssueEvents chan *github.IssueEvent
 }
 
 func New(secret string) *Server {
 	return &Server{
-		secret:     secret,
-		PushEvents: make(chan *github.PushEvent, 1),
+		secret:      secret,
+		PushEvents:  make(chan *github.PushEvent),
+		IssueEvents: make(chan *github.IssueEvent),
 	}
 }
 
@@ -63,7 +65,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var handler func(body []byte) error
 
 	if eventType == "push" {
-		handler = s.push
+		handler = s.pushEventHandler
+	} else if eventType == "issue" {
+		handler = s.issueEventHandler
 	}
 
 	if err := handler(body); err != nil {
@@ -71,15 +75,30 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *Server) push(body []byte) error {
-	var pushEvent *github.PushEvent
-	err := json.Unmarshal(body, &pushEvent)
+func (s *Server) pushEventHandler(body []byte) error {
+	var event *github.PushEvent
+	err := json.Unmarshal(body, &event)
 	if err != nil {
 		return err
 	}
 
 	select {
-	case s.PushEvents <- pushEvent:
+	case s.PushEvents <- event:
+	default:
+	}
+
+	return nil
+}
+
+func (s *Server) issueEventHandler(body []byte) error {
+	var event *github.IssueEvent
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case s.IssueEvents <- event:
 	default:
 	}
 

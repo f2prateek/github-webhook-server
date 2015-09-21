@@ -38,12 +38,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	defer req.Body.Close()
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		httpError(w, "", http.StatusInternalServerError)
 		return
 	}
-	defer req.Body.Close()
 
 	if s.secret != "" {
 		sig := req.Header.Get("X-Hub-Signature")

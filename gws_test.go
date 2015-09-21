@@ -19,8 +19,26 @@ func TestInvalidMethod(t *testing.T) {
 
 	resp, err := http.Get(ts.URL)
 	check(err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	check(err)
+	assert.Equal(t, "Method Not Allowed: GET\n", string(body))
+}
+
+func TestMissingEventType(t *testing.T) {
+	_, ts := newTestServer("")
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL, "", nil)
+	check(err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	check(err)
+	assert.Equal(t, "Bad Request: Missing X-GitHub-Event Header\n", string(body))
 }
 
 func TestPushEvent(t *testing.T) {
@@ -82,8 +100,7 @@ func post(url, file string) *http.Response {
 		req.Header.Add("X-Hub-Signature", *fixture.Signature)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	check(err)
 
 	return resp

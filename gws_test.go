@@ -3,6 +3,7 @@ package gws
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -39,6 +40,19 @@ func TestMissingEventType(t *testing.T) {
 	body, err := ioutil.ReadAll(resp.Body)
 	check(err)
 	assert.Equal(t, "Bad Request: Missing X-GitHub-Event Header\n", string(body))
+}
+
+func TestNoBody(t *testing.T) {
+	_, ts := newTestServer("")
+	defer ts.Close()
+
+	resp := post(ts.URL, "no_body")
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	check(err)
+	assert.Equal(t, "Internal Server Error: Could not decode body\n", string(body))
 }
 
 func TestPushEvent(t *testing.T) {
@@ -82,14 +96,17 @@ func post(url, file string) *http.Response {
 	check(err)
 
 	var fixture struct {
-		Event     *string         `json:"event"`
-		Signature *string         `json:"signature"`
-		Payload   json.RawMessage `json:"payload"`
+		Event     *string          `json:"event"`
+		Signature *string          `json:"signature"`
+		Payload   *json.RawMessage `json:"payload"`
 	}
 	err = json.Unmarshal(data, &fixture)
 	check(err)
 
-	requestBody := bytes.NewReader(fixture.Payload)
+	var requestBody io.Reader
+	if fixture.Payload != nil {
+		requestBody = bytes.NewReader(*fixture.Payload)
+	}
 	req, err := http.NewRequest("POST", url, requestBody)
 	check(err)
 

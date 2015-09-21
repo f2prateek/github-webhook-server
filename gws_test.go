@@ -13,6 +13,16 @@ import (
 	"github.com/google/go-github/github"
 )
 
+func TestInvalidMethod(t *testing.T) {
+	_, ts := newTestServer("")
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	check(err)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+}
+
 func TestPushEvent(t *testing.T) {
 	s, ts := newTestServer("")
 	defer ts.Close()

@@ -60,17 +60,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if eventType == "push" {
-		var pushEvent *github.PushEvent
-		err := json.Unmarshal(body, &pushEvent)
-		if err != nil {
-			httpError(w, "Could not decode body", http.StatusInternalServerError)
-			return
-		}
+	var handler func(body []byte) error
 
-		select {
-		case s.PushEvents <- pushEvent:
-		default:
-		}
+	if eventType == "push" {
+		handler = s.push
 	}
+
+	if err := handler(body); err != nil {
+		httpError(w, "Could not decode body", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) push(body []byte) error {
+	var pushEvent *github.PushEvent
+	err := json.Unmarshal(body, &pushEvent)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case s.PushEvents <- pushEvent:
+	default:
+	}
+
+	return nil
 }

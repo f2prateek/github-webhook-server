@@ -16,6 +16,7 @@ type Server struct {
 	PushEvents         chan *github.PushEvent
 	IssueEvents        chan *github.IssueEvent
 	IssueCommentEvents chan *github.IssueCommentEvent
+	PullRequestEvents  chan *github.PullRequestEvent
 }
 
 func New(secret string) *Server {
@@ -24,6 +25,7 @@ func New(secret string) *Server {
 		PushEvents:         make(chan *github.PushEvent),
 		IssueEvents:        make(chan *github.IssueEvent),
 		IssueCommentEvents: make(chan *github.IssueCommentEvent),
+		PullRequestEvents:  make(chan *github.PullRequestEvent),
 	}
 }
 
@@ -72,6 +74,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		handler = s.issueEventHandler
 	} else if eventType == "issue_comment" {
 		handler = s.issueCommentEventHandler
+	} else if eventType == "pull_request" {
+		handler = s.pullRequestEventHandler
 	}
 
 	if err := handler(body); err != nil {
@@ -118,6 +122,21 @@ func (s *Server) issueCommentEventHandler(body []byte) error {
 
 	select {
 	case s.IssueCommentEvents <- event:
+	default:
+	}
+
+	return nil
+}
+
+func (s *Server) pullRequestEventHandler(body []byte) error {
+	var event *github.PullRequestEvent
+	err := json.Unmarshal(body, &event)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case s.PullRequestEvents <- event:
 	default:
 	}
 

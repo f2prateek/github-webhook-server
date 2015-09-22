@@ -17,8 +17,19 @@ func main() {
 
 	s := gws.New(*secret)
 	go func() {
-		for event := range s.PushEvents {
-			fmt.Println("Received push: " + *event.Ref)
+		for {
+			select {
+			case event := <-s.PushEvents:
+				fmt.Println("Received Push", event)
+			case event := <-s.IssueEvents:
+				fmt.Println("Received Issue", event)
+			case event := <-s.IssueCommentEvents:
+				fmt.Println("Received Issue Comment", event)
+			case event := <-s.PullRequestEvents:
+				fmt.Println("Received PR", event)
+			case event := <-s.OtherEvents:
+				fmt.Println("Received event", event)
+			}
 		}
 	}()
 
